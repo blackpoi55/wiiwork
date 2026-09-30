@@ -1,0 +1,279 @@
+/* ขนาดและพิกัดทั้งหมดยึดตามไฟล์ PDF ตัวอย่างหน่วยเป็น pt (A4 = 595.2 x 841.8) */
+
+.doc {
+  --grid: #002060;
+  --hair: 0.75pt;
+  color: #000;
+  background: #fff;
+}
+
+.page {
+  position: relative;
+  width: 595.2pt;
+  height: 841.8pt;
+  background: #fff;
+  overflow: hidden;
+  page-break-after: always;
+  break-after: page;
+  box-sizing: border-box;
+}
+
+.page:last-child {
+  page-break-after: auto;
+  break-after: auto;
+}
+
+.abs {
+  position: absolute;
+  white-space: pre;
+}
+
+.logo {
+  position: absolute;
+  left: 54.8pt;
+  top: 52.3pt;
+  width: 41.1pt;
+  height: 64.4pt;
+  object-fit: contain;
+}
+
+.tahoma {
+  font-family: Tahoma, "Segoe UI", sans-serif;
+}
+
+.ang {
+  font-family: "Angsana New", AngsanaUPC, "Leelawadee UI", "Sarabun", serif;
+}
+
+.title {
+  position: absolute;
+  left: 51.6pt;
+  top: 143.6pt;
+  width: 488.5pt;
+  text-align: center;
+  font-size: 13.6pt;
+  font-weight: 700;
+  line-height: 17.9pt;
+}
+
+.docNoRule {
+  position: absolute;
+  left: 393.5pt;
+  top: 141pt;
+  width: 146.6pt;
+  border-top: 0.7pt solid #000;
+}
+
+/* ------------------------------- ตารางหลัก ------------------------------- */
+
+.table {
+  position: absolute;
+  left: 51.6pt;
+  top: 164.5pt;
+  width: 488.5pt;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13.6pt;
+  line-height: 1;
+}
+
+.table td {
+  border: var(--hair) solid var(--grid);
+  height: 17.9pt;
+  padding: 0;
+  overflow: hidden;
+  vertical-align: middle;
+  /* Excel ไม่ตัดบรรทัดในเซลล์ — ต้องคงความสูงแถวไว้ที่ 17.9pt เสมอ */
+  white-space: nowrap;
+}
+
+.table td > span {
+  display: block;
+  /* ดันข้อความลงให้ baseline ตรงกับต้นฉบับ */
+  transform: translateY(0.6pt);
+}
+
+.noBorder {
+  border: none !important;
+}
+
+.labelL {
+  text-align: right;
+  padding-right: 1.7pt !important;
+  font-weight: 700;
+}
+
+.valueL {
+  text-align: left;
+  padding-left: 1.6pt !important;
+}
+
+.labelR {
+  text-align: left;
+  padding-left: 1.6pt !important;
+  font-weight: 700;
+}
+
+.valueR {
+  text-align: left;
+  padding-left: 2.1pt !important;
+}
+
+.bold {
+  font-weight: 700;
+}
+
+.center {
+  text-align: center;
+}
+
+.right {
+  text-align: right;
+  padding-right: 4.7pt !important;
+}
+
+.rightTight {
+  text-align: right;
+  padding-right: 1.7pt !important;
+}
+
+/* ขีด "-" ของแถวว่าง วางตามรูปแบบ accounting ของ Excel */
+.dash {
+  text-align: right;
+  padding-right: 13.7pt !important;
+}
+
+.headCell {
+  text-align: center;
+  font-weight: 700;
+  vertical-align: top;
+  line-height: 17.9pt;
+}
+
+.headCell > span {
+  transform: none;
+}
+
+.headTwoLine {
+  line-height: 17.9pt;
+}
+
+.desc {
+  text-align: left;
+  padding-left: 1.6pt !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ------------------------------- ท้ายเอกสาร ------------------------------ */
+
+.note {
+  left: 109.3pt;
+  top: 626.3pt;
+  font-size: 13.6pt;
+  font-weight: 700;
+}
+
+.approver {
+  left: 53.2pt;
+  top: 662pt;
+  width: 52.8pt;
+  text-align: right;
+  font-size: 13.6pt;
+  font-weight: 700;
+}
+
+.approverDate {
+  left: 53.2pt;
+  top: 679.9pt;
+  width: 47.2pt;
+  text-align: right;
+  font-size: 13.6pt;
+  font-weight: 700;
+}
+
+.ruleA {
+  position: absolute;
+  left: 107.7pt;
+  top: 683.1pt;
+  width: 227pt;
+  border-top: 0.7pt solid #000;
+}
+
+.ruleB {
+  position: absolute;
+  left: 107.7pt;
+  top: 701pt;
+  width: 227pt;
+  border-top: 0.7pt solid #000;
+}
+
+.regards {
+  left: 446.5pt;
+  top: 662.4pt;
+  font-size: 13.6pt;
+}
+
+.signerName {
+  left: 443.5pt;
+  top: 698.1pt;
+  font-size: 13.6pt;
+}
+
+.signature {
+  position: absolute;
+  left: 454pt;
+  top: 682pt;
+  width: 48pt;
+  height: 21.5pt;
+  object-fit: contain;
+}
+
+/* ------------------------------- หน้ารูปภาพ ------------------------------ */
+
+.photoTable {
+  position: absolute;
+  left: 72pt;
+  top: 72.25pt;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.photoCell {
+  border: 0.5pt solid #000;
+  padding: 5.7pt;
+  vertical-align: middle;
+  text-align: center;
+}
+
+.photoBox {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.photoImg {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  object-fit: contain;
+  display: block;
+}
+
+.photoCaption {
+  font-family: "Angsana New", AngsanaUPC, "Sarabun", serif;
+  font-size: 12pt;
+  line-height: 13pt;
+  margin-top: 2pt;
+  text-align: center;
+  overflow: hidden;
+}
+
+.photoEmpty {
+  border: none;
+}
