@@ -1,4 +1,4 @@
-import type { CompanyProfile, Preset, Quotation, Settings } from "./types";
+import type { CompanyProfile, InfoRow, Preset, Quotation, Settings } from "./types";
 import { todayISO } from "./thai";
 
 export const DEFAULT_COMPANY: CompanyProfile = {
@@ -22,12 +22,62 @@ export const DEFAULT_PRESETS: Preset[] = [
   { id: "p6", description: "เก็บขยะขนทิ้งพร้อมความสะอาด", unit: "งาน", unitPrice: 500 },
 ];
 
+export function makeInfoRow(partial: Partial<InfoRow> = {}): InfoRow {
+  return {
+    id: `ir-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    leftLabel: "",
+    leftValue: "",
+    leftBold: false,
+    rightLabel: "",
+    rightValue: "",
+    ...partial,
+  };
+}
+
+/** บล็อกหัวเอกสารแบบเดียวกับฟอร์มเดิมทุกบรรทัด */
+export function defaultInfoRows(): InfoRow[] {
+  return [
+    makeInfoRow({
+      leftLabel: "เสนอต่อ",
+      leftValue: "{{ลูกค้า}}",
+      rightLabel: "อ้างถึง P/O No.",
+      rightValue: "{{PO}}",
+    }),
+    makeInfoRow({
+      leftValue: "{{ที่อยู่}}",
+      leftBold: true,
+      rightLabel: "วันที่",
+      rightValue: "{{วันที่}}",
+    }),
+    makeInfoRow({ rightLabel: "ผู้ขอเสนอราคา", rightValue: "{{ผู้ขอเสนอราคา}}" }),
+    makeInfoRow(),
+    makeInfoRow({
+      leftLabel: "รายละเอียด",
+      leftValue: "เสนอราคางานซ่อมแซมปรับปรุง",
+      rightLabel: "เงื่อนไข",
+      rightValue: "1. ราคานี้รวมค่าวัสดุและค่าแรงแล้ว",
+    }),
+    makeInfoRow({
+      leftLabel: "งานทาสี",
+      leftValue: "งานซ่อมปรับปรุงซ่อมแซม เนื่องจากภัยภิบัติ แผ่นดินไหว",
+      leftBold: true,
+      rightValue: "2.รวมภาษีมูลค่าเพิ่ม 7 %",
+    }),
+    makeInfoRow({ leftValue: "ณ.วันที่ 28 มีนาคม 2568", leftBold: true }),
+    makeInfoRow({
+      leftLabel: "สิ่งที่ส่งมาด้วย",
+      leftValue: "เอกสารภาพความเสียหาย แนบประกอบจำนวน {{จำนวนแผ่นรูป}} แผ่น",
+      leftBold: true,
+    }),
+  ];
+}
+
 export const DEFAULT_SETTINGS: Settings = {
   company: DEFAULT_COMPANY,
   defaultQuoterName: "อุทัย  ศรีบุญ",
   defaultCustomerName: "นิติบุคคลอาคารชุดลุมพินี วิลล์ จรัญฯ - ไฟฉาย",
   defaultProjectName: "จรัญ22",
-  defaultConditions: ["1. ราคานี้รวมค่าวัสดุและค่าแรงแล้ว", "2.รวมภาษีมูลค่าเพิ่ม 7 %"],
+  defaultInfoRows: defaultInfoRows(),
   /** ค่าดำเนินการคิด 10% ของยอดรวมรายการ (ตรงกับใบเก่าทั้ง 120 ใบ) */
   defaultOperationFee: 10,
   vatRate: 7,
@@ -50,14 +100,7 @@ export function newQuotation(settings: Settings): Quotation {
     poRef: "",
     quoterName: settings.defaultQuoterName,
 
-    detailLabel: "รายละเอียด",
-    detailValue: "เสนอราคางานซ่อมแซมปรับปรุง",
-    workTypeLabel: "งานทาสี",
-    workTypeValue: "งานซ่อมปรับปรุงซ่อมแซม เนื่องจากภัยภิบัติ แผ่นดินไหว",
-    incidentDate: "ณ.วันที่ 28 มีนาคม 2568",
-    attachmentLabel: "สิ่งที่ส่งมาด้วย",
-    attachmentValue: "เอกสารภาพความเสียหาย แนบประกอบจำนวน 0 แผ่น",
-    conditions: [...settings.defaultConditions],
+    infoRows: (settings.defaultInfoRows ?? defaultInfoRows()).map((r) => makeInfoRow(r)),
 
     items: [],
     minRows: 11,

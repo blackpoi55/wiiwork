@@ -27,6 +27,19 @@ export type CompanyProfile = {
   signatureFile: string;
 };
 
+/**
+ * หนึ่งบรรทัดในบล็อกข้อมูลหัวเอกสาร (แถว 7-14 ของฟอร์มเดิม)
+ * เพิ่ม ลบ สลับลำดับได้อิสระ ฝั่งซ้ายและฝั่งขวาแยกกันคนละคอลัมน์
+ */
+export type InfoRow = {
+  id: string;
+  leftLabel: string;
+  leftValue: string;
+  leftBold: boolean;
+  rightLabel: string;
+  rightValue: string;
+};
+
 export type Quotation = {
   /** yyyy-MM-dd (ค.ศ.) */
   date: string;
@@ -40,14 +53,8 @@ export type Quotation = {
   poRef: string;
   quoterName: string;
 
-  detailLabel: string;
-  detailValue: string;
-  workTypeLabel: string;
-  workTypeValue: string;
-  incidentDate: string;
-  attachmentLabel: string;
-  attachmentValue: string;
-  conditions: string[];
+  /** บล็อกข้อมูลหัวเอกสาร — ยืดหยุ่น เพิ่ม/ลดบรรทัดได้ */
+  infoRows: InfoRow[];
 
   items: LineItem[];
   /** จำนวนแถวรายการขั้นต่ำที่พิมพ์ (เว้นบรรทัดว่างเหมือนฟอร์มเดิม) */
@@ -60,12 +67,22 @@ export type Quotation = {
   includeVat: boolean;
 
   photos: Photo[];
-  photosPerPage: 4 | 6;
+  photosPerPage: 2 | 4 | 6 | 9;
 
   company: CompanyProfile;
 
   createdAt: string;
   updatedAt: string;
+
+  /* ---- ฟิลด์รุ่นเก่า เก็บไว้อ่านไฟล์ที่บันทึกก่อนเปลี่ยนมาใช้ infoRows ---- */
+  detailLabel?: string;
+  detailValue?: string;
+  workTypeLabel?: string;
+  workTypeValue?: string;
+  incidentDate?: string;
+  attachmentLabel?: string;
+  attachmentValue?: string;
+  conditions?: string[];
 };
 
 export type QuotationRef = {
@@ -100,8 +117,11 @@ export type Settings = {
   defaultQuoterName: string;
   defaultCustomerName: string;
   defaultProjectName: string;
-  defaultConditions: string[];
+  /** หน้าตาบล็อกหัวเอกสารของใบใหม่ */
+  defaultInfoRows: InfoRow[];
   defaultOperationFee: number;
   vatRate: number;
   presets: Preset[];
+  /** ฟิลด์รุ่นเก่า ใช้แปลงไฟล์ settings เดิม */
+  defaultConditions?: string[];
 };

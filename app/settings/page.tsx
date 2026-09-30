@@ -9,11 +9,13 @@ import {
   Plus,
   RotateCcw,
   Save,
+  ScrollText,
   SlidersHorizontal,
   Trash2,
   Zap,
 } from "lucide-react";
 import AppShell from "@/components/AppShell";
+import InfoRowsEditor from "@/components/InfoRowsEditor";
 import PageHeader from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
@@ -242,16 +244,19 @@ export default function SettingsPage() {
                 />
               </div>
             </div>
-            <div>
-              <label className="label">เงื่อนไขเริ่มต้น (บรรทัดละข้อ)</label>
-              <textarea
-                className="field resize-y"
-                rows={3}
-                value={settings.defaultConditions.join("\n")}
-                onChange={(e) => patch({ defaultConditions: e.target.value.split("\n") })}
-              />
-            </div>
           </div>
+        </Section>
+
+        <Section
+          icon={ScrollText}
+          title="บล็อกข้อมูลกลางฟอร์มของใบใหม่"
+          description="กำหนดว่าใบเสนอราคาใหม่จะเริ่มต้นด้วยบรรทัดอะไรบ้าง — เพิ่ม ลบ สลับได้อิสระ"
+          className="lg:col-span-2"
+        >
+          <InfoRowsEditor
+            rows={settings.defaultInfoRows}
+            onChange={(defaultInfoRows) => patch({ defaultInfoRows })}
+          />
         </Section>
 
         <Section

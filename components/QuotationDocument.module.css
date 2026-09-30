@@ -64,12 +64,17 @@
   border-top: 0.7pt solid #000;
 }
 
-/* ------------------------------- ตารางหลัก ------------------------------- */
-
-.table {
+/* ตารางกับบล็อกลายเซ็นไหลต่อกัน บล็อกลายเซ็นจึงเลื่อนลงตามเมื่อเพิ่มแถว */
+.body {
   position: absolute;
   left: 51.6pt;
   top: 164.5pt;
+  width: 488.5pt;
+}
+
+/* ------------------------------- ตารางหลัก ------------------------------- */
+
+.table {
   width: 488.5pt;
   border-collapse: collapse;
   table-layout: fixed;
@@ -91,10 +96,6 @@
   display: block;
   /* ดันข้อความลงให้ baseline ตรงกับต้นฉบับ */
   transform: translateY(0.6pt);
-}
-
-.noBorder {
-  border: none !important;
 }
 
 .labelL {
@@ -154,10 +155,6 @@
   transform: none;
 }
 
-.headTwoLine {
-  line-height: 17.9pt;
-}
-
 .desc {
   text-align: left;
   padding-left: 1.6pt !important;
@@ -168,63 +165,66 @@
 
 /* ------------------------------- ท้ายเอกสาร ------------------------------ */
 
-.note {
-  left: 109.3pt;
-  top: 626.3pt;
+.footer {
+  position: relative;
+  height: 104.5pt;
   font-size: 13.6pt;
+}
+
+.footer > * {
+  position: absolute;
+  white-space: pre;
+}
+
+.note {
+  left: 57.7pt;
+  top: 14.8pt;
   font-weight: 700;
 }
 
 .approver {
-  left: 53.2pt;
-  top: 662pt;
+  left: 1.6pt;
+  top: 50.5pt;
   width: 52.8pt;
   text-align: right;
-  font-size: 13.6pt;
   font-weight: 700;
 }
 
 .approverDate {
-  left: 53.2pt;
-  top: 679.9pt;
+  left: 1.6pt;
+  top: 68.4pt;
   width: 47.2pt;
   text-align: right;
-  font-size: 13.6pt;
   font-weight: 700;
 }
 
 .ruleA {
-  position: absolute;
-  left: 107.7pt;
-  top: 683.1pt;
+  left: 56.1pt;
+  top: 71.6pt;
   width: 227pt;
   border-top: 0.7pt solid #000;
 }
 
 .ruleB {
-  position: absolute;
-  left: 107.7pt;
-  top: 701pt;
+  left: 56.1pt;
+  top: 89.5pt;
   width: 227pt;
   border-top: 0.7pt solid #000;
 }
 
 .regards {
-  left: 446.5pt;
-  top: 662.4pt;
-  font-size: 13.6pt;
+  left: 394.9pt;
+  top: 50.9pt;
 }
 
 .signerName {
-  left: 443.5pt;
-  top: 698.1pt;
-  font-size: 13.6pt;
+  left: 391.9pt;
+  top: 86.6pt;
 }
 
 .signature {
-  position: absolute;
-  left: 454pt;
-  top: 682pt;
+  left: 402.4pt;
+  top: 70.5pt;
   width: 48pt;
   height: 21.5pt;
   object-fit: contain;
@@ -245,6 +245,7 @@
   padding: 5.7pt;
   vertical-align: middle;
   text-align: center;
+  box-sizing: border-box;
 }
 
 .photoBox {
@@ -272,8 +273,4 @@
   margin-top: 2pt;
   text-align: center;
   overflow: hidden;
-}
-
-.photoEmpty {
-  border: none;
 }

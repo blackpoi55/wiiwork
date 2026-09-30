@@ -14,6 +14,7 @@ import {
   Upload,
 } from "lucide-react";
 import { api, photoUrl } from "@/lib/client";
+import type { PhotosPerPage } from "@/lib/layout";
 import { useToast } from "./ui/Toast";
 import { useConfirm } from "./ui/Confirm";
 import type { Photo } from "@/lib/types";
@@ -22,7 +23,7 @@ import PhotoCropper from "./PhotoCropper";
 type Props = {
   refKey: string | null;
   photos: Photo[];
-  photosPerPage: 4 | 6;
+  photosPerPage: PhotosPerPage;
   /** autoSave = true เมื่อเป็นการเพิ่ม/ลบ/สลับรูป ซึ่งควรบันทึกลงไฟล์ทันที */
   onChange: (photos: Photo[], autoSave?: boolean) => void;
   onNeedSave?: () => void;

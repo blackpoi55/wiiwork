@@ -3,11 +3,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { Quotation } from "./types";
 import { computeTotals, itemLabel, lineAmount } from "./totals";
-import { bahtText, thaiDate } from "./thai";
-
-/** แถวรายการในฟอร์ม Excel เดิม = แถว 17 ถึง 27 */
-const FIRST_ITEM_ROW = 17;
-const LAST_ITEM_ROW = 27;
+import { bahtText } from "./thai";
+import { resolveText } from "./placeholders";
+import { LEADING_BLANK_ROWS, printedItemRows } from "./layout";
 
 const NAVY = "FF002060";
 const BLACK = "FF000000";
@@ -32,6 +30,42 @@ function sheetSafeName(name: string, fallback: string): string {
   return cleaned || fallback;
 }
 
+/** ตำแหน่งแถวทั้งหมดของฟอร์ม คำนวณจากจำนวนบรรทัดหัวเอกสารและจำนวนแถวรายการ */
+export function sheetRows(q: Quotation) {
+  const filled = q.items.filter((i) => i.description.trim() || i.qty || i.unitPrice);
+  const itemRows = printedItemRows(q.infoRows.length, filled.length, q.minRows);
+
+  const infoStart = 7;
+  const infoEnd = infoStart + q.infoRows.length - 1;
+  const head1 = infoEnd + 1;
+  const head2 = head1 + 1;
+  const itemStart = head2 + 1;
+  const itemEnd = itemStart + itemRows - 1;
+  const fee = itemEnd + 1;
+  const sub = fee + 1;
+  const vat = sub + 1;
+  const grand = vat + 1;
+
+  return {
+    filled,
+    itemRows,
+    infoStart,
+    infoEnd,
+    head1,
+    head2,
+    itemStart,
+    itemEnd,
+    fee,
+    sub,
+    vat,
+    grand,
+    note: grand + 2,
+    approver: grand + 4,
+    approverDate: grand + 5,
+    signer: grand + 6,
+  };
+}
+
 /** วางฟอร์มใบเสนอราคาหนึ่งใบลงใน worksheet ที่ให้มา */
 export function writeQuotationSheet(
   ws: ExcelJS.Worksheet,
@@ -39,6 +73,8 @@ export function writeQuotationSheet(
   images: { logo?: number; signature?: number },
 ): void {
   const totals = computeTotals(q);
+  const R = sheetRows(q);
+  const text = (value: string) => resolveText(q, value);
 
   ws.pageSetup = {
     paperSize: 9,
@@ -55,7 +91,7 @@ export function writeQuotationSheet(
   ws.getColumn(6).width = 8.43;
   ws.getColumn(7).width = 8.71;
 
-  for (let r = 1; r <= 39; r++) ws.getRow(r).height = 21;
+  for (let r = 1; r <= R.signer + 2; r++) ws.getRow(r).height = 21;
   ws.getRow(6).height = 27.75;
 
   const set = (
@@ -81,7 +117,9 @@ export function writeQuotationSheet(
   set("B2", c.nameTh, { name: "Tahoma", size: 9, bold: true }, undefined, {
     bottom: thin(BLACK),
   });
-  for (const a of ["C2", "D2", "E2"]) set(a, undefined, undefined, undefined, { bottom: thin(BLACK) });
+  for (const a of ["C2", "D2", "E2"]) {
+    set(a, undefined, undefined, undefined, { bottom: thin(BLACK) });
+  }
   set("B3", c.nameEn, { name: "Tahoma", size: 9, bold: true });
   set("B4", c.phone, { name: "Tahoma", size: 8 });
   set("D4", `หมายเลขประจำตัวผู้เสียภาษี ${c.taxId}`, { name: "Tahoma", size: 8, bold: true });
@@ -94,81 +132,58 @@ export function writeQuotationSheet(
   set("A6", "ใบขอเสนอราคา", ang(16, true), { horizontal: "center" }, { bottom: thin() });
 
   /* ----------------------------- บล็อกข้อมูลหัวเรื่อง ---------------------------- */
-  const leftLabel: Partial<ExcelJS.Alignment> = { horizontal: "right" };
-  const box = (top?: boolean, bottom?: boolean): BorderStyle => ({
-    left: thin(),
-    right: thin(),
-    ...(top ? { top: thin() } : {}),
-    ...(bottom ? { bottom: thin() } : {}),
-  });
-  const rightValueBox = (top?: boolean, bottom?: boolean): BorderStyle => ({
-    left: thin(),
-    ...(top ? { top: thin() } : {}),
-    ...(bottom ? { bottom: thin() } : {}),
-  });
-
-  set("A7", "เสนอต่อ", ang(16, true), leftLabel, box(true));
-  set("B7", q.customerName, ang(16), undefined, box(true));
-  set("C7", "อ้างถึง P/O No.", ang(16, true), undefined, box(true, true));
-  set("D7", q.poRef, ang(16), { horizontal: "left" }, rightValueBox(true, true));
-  set("E7", undefined, ang(16), undefined, { top: thin(), bottom: thin() });
-  set("F7", undefined, ang(16), undefined, { right: thin(), top: thin(), bottom: thin() });
-
-  set("A8", undefined, ang(16), leftLabel, box());
-  set("B8", q.addressLine, ang(16, true), undefined, box());
-  set("C8", "วันที่", ang(16, true), undefined, box(true, true));
-  set("D8", thaiDate(q.date), ang(16), { horizontal: "left" }, rightValueBox(true, true), "@");
-  set("E8", undefined, ang(16), undefined, { top: thin(), bottom: thin() });
-  set("F8", undefined, ang(16), undefined, { right: thin(), top: thin(), bottom: thin() });
-
-  set("A9", undefined, ang(16), leftLabel, box());
-  set("B9", undefined, ang(16), undefined, box());
-  set("C9", "ผู้ขอเสนอราคา", ang(16, true), undefined, box(true, true));
-  set("D9", q.quoterName, ang(16), { horizontal: "left" }, rightValueBox(true, true), "@");
-  set("E9", undefined, ang(16), undefined, { top: thin(), bottom: thin() });
-  set("F9", undefined, ang(16), undefined, { right: thin(), top: thin(), bottom: thin() });
-
-  set("A10", undefined, ang(16), leftLabel, box());
-  set("B10", undefined, ang(16), undefined, box());
-  set("C10", undefined, ang(16, true), undefined, box(true));
-  set("D10", undefined, ang(16), undefined, rightValueBox(true, true));
-  set("E10", undefined, ang(16), undefined, { top: thin(), bottom: thin() });
-  set("F10", undefined, ang(16), undefined, { right: thin(), top: thin(), bottom: thin() });
-
-  const rows: Array<[string, string, string, string]> = [
-    [q.detailLabel, q.detailValue, "เงื่อนไข", q.conditions[0] ?? ""],
-    [q.workTypeLabel, q.workTypeValue, "", q.conditions[1] ?? ""],
-    ["", q.incidentDate, "", q.conditions[2] ?? ""],
-    [q.attachmentLabel, q.attachmentValue, "", q.conditions[3] ?? ""],
-  ];
-  rows.forEach(([a, b, cc, d], i) => {
-    const r = 11 + i;
-    const boldValue = i >= 1;
-    set(`A${r}`, a, ang(16, true), leftLabel, { left: thin(BLACK), right: thin(BLACK) });
-    set(`B${r}`, b, ang(16, boldValue), undefined, { left: thin(BLACK), right: thin(BLACK) });
-    set(`C${r}`, cc, ang(16, true), undefined, { left: thin(BLACK), right: thin(BLACK) });
-    set(`D${r}`, d, ang(16), undefined, {
-      left: thin(BLACK),
-      top: thin(BLACK),
-      bottom: thin(BLACK),
+  q.infoRows.forEach((row, i) => {
+    const r = R.infoStart + i;
+    const top = i === 0 ? thin() : undefined;
+    const bottom = i === q.infoRows.length - 1 ? thin() : undefined;
+    const cellBorder = (extra: BorderStyle = {}): BorderStyle => ({
+      ...(top ? { top } : {}),
+      ...(bottom ? { bottom } : {}),
+      ...extra,
     });
-    set(`E${r}`, undefined, ang(16), undefined, { top: thin(BLACK), bottom: thin(BLACK) });
-    set(`F${r}`, undefined, ang(16), undefined, {
-      right: thin(BLACK),
-      top: thin(BLACK),
-      bottom: thin(BLACK),
-    });
+
+    set(
+      `A${r}`,
+      text(row.leftLabel),
+      ang(16, true),
+      { horizontal: "right" },
+      cellBorder({ left: thin(), right: thin() }),
+    );
+    set(
+      `B${r}`,
+      text(row.leftValue),
+      ang(16, row.leftBold),
+      undefined,
+      cellBorder({ left: thin(), right: thin() }),
+    );
+    set(
+      `C${r}`,
+      text(row.rightLabel),
+      ang(16, true),
+      undefined,
+      cellBorder({ left: thin(), right: thin() }),
+    );
+    set(
+      `D${r}`,
+      text(row.rightValue),
+      ang(16),
+      { horizontal: "left" },
+      cellBorder({ left: thin() }),
+      "@",
+    );
+    set(`E${r}`, undefined, ang(16), undefined, cellBorder());
+    set(`F${r}`, undefined, ang(16), undefined, cellBorder({ right: thin() }));
   });
-  ws.getCell("A14").border = { left: thin(BLACK), right: thin(BLACK), bottom: thin(BLACK) };
-  ws.getCell("B14").border = { left: thin(BLACK), right: thin(BLACK), bottom: thin(BLACK) };
-  ws.getCell("C14").border = { left: thin(BLACK), right: thin(BLACK), bottom: thin(BLACK) };
 
   /* ------------------------------ หัวตารางรายการ ------------------------------ */
   const heads = ["ลำดับ", "รายการ", "หน่วย", "จำนวน ", "ราคา/หน่วย", "จำนวนเงิน"];
   heads.forEach((h, i) => {
     const col = String.fromCharCode(65 + i);
-    set(`${col}15`, h, ang(16, true), { horizontal: "center" }, { left: thin(), right: thin() });
-    set(`${col}16`, i >= 4 ? "(บาท)" : undefined, ang(16, true), { horizontal: "center" }, {
+    set(`${col}${R.head1}`, h, ang(16, true), { horizontal: "center" }, {
+      left: thin(),
+      right: thin(),
+    });
+    set(`${col}${R.head2}`, i >= 4 ? "(บาท)" : undefined, ang(16, true), { horizontal: "center" }, {
       left: thin(),
       right: thin(),
       bottom: thin(),
@@ -176,24 +191,21 @@ export function writeQuotationSheet(
   });
 
   /* -------------------------------- แถวรายการ ------------------------------- */
-  const filled = q.items.filter((i) => i.description.trim() || i.qty || i.unitPrice);
-  for (let r = FIRST_ITEM_ROW; r <= LAST_ITEM_ROW; r++) {
-    // แถว 17 เว้นว่างเสมอ รายการเริ่มที่แถว 18 (ตามฟอร์มเดิม)
-    const index = r - FIRST_ITEM_ROW - 1;
-    const item = index >= 0 ? filled[index] : undefined;
-    const top = r === FIRST_ITEM_ROW ? thin() : hair();
-    const bottom = r === LAST_ITEM_ROW ? undefined : hair();
+  const visible = R.filled.slice(0, Math.max(0, R.itemRows - LEADING_BLANK_ROWS));
+  for (let r = R.itemStart; r <= R.itemEnd; r++) {
+    const index = r - R.itemStart - LEADING_BLANK_ROWS;
+    const item = index >= 0 ? visible[index] : undefined;
     const cellBorder: BorderStyle = {
       left: thin(BLACK),
       right: thin(BLACK),
-      top,
-      ...(bottom ? { bottom } : {}),
+      top: r === R.itemStart ? thin() : hair(),
+      ...(r === R.itemEnd ? {} : { bottom: hair() }),
     };
 
     set(`A${r}`, item ? index + 1 : undefined, ang(16), undefined, cellBorder);
     set(
       `B${r}`,
-      item ? itemLabel(index + 1, item.description) : undefined,
+      item ? itemLabel(index + 1, text(item.description)) : undefined,
       ang(16),
       undefined,
       cellBorder,
@@ -201,6 +213,7 @@ export function writeQuotationSheet(
     set(`C${r}`, item?.unit, ang(16), { horizontal: "center" }, cellBorder);
     set(`D${r}`, item?.qty, ang(16), undefined, cellBorder);
     set(`E${r}`, item?.unitPrice, ang(16), undefined, cellBorder, ACCOUNTING);
+
     const f = ws.getCell(`F${r}`);
     f.value = {
       formula: `SUM(D${r}*E${r})`,
@@ -212,11 +225,11 @@ export function writeQuotationSheet(
   }
 
   /* --------------------------------- สรุปยอด -------------------------------- */
-  ws.mergeCells("D28:E28");
-  ws.mergeCells("D29:E29");
-  ws.mergeCells("D30:E30");
-  ws.mergeCells("D31:E31");
-  ws.mergeCells("A31:C31");
+  ws.mergeCells(`D${R.fee}:E${R.fee}`);
+  ws.mergeCells(`D${R.sub}:E${R.sub}`);
+  ws.mergeCells(`D${R.vat}:E${R.vat}`);
+  ws.mergeCells(`D${R.grand}:E${R.grand}`);
+  ws.mergeCells(`A${R.grand}:C${R.grand}`);
 
   const totalLeft = (r: number, border: BorderStyle) => {
     set(`A${r}`, undefined, ang(16, true), { horizontal: "right" }, {
@@ -235,92 +248,91 @@ export function writeQuotationSheet(
     });
   };
 
-  totalLeft(28, { left: thin(BLACK), right: thin(BLACK), top: thin(BLACK), bottom: hair() });
-  set("D28", "ค่าดำเนินการ", ang(16), { horizontal: "center", vertical: "middle" }, {
+  const totalCell = (
+    row: number,
+    label: string,
+    value: ExcelJS.CellValue,
+    bold: boolean,
+    border: BorderStyle,
+  ) => {
+    set(`D${row}`, label, ang(16, bold), { horizontal: "center", vertical: "middle" }, border);
+    const f = ws.getCell(`F${row}`);
+    f.value = value;
+    f.font = ang(16, bold);
+    f.numFmt = ACCOUNTING;
+    f.alignment = { horizontal: "right" };
+    f.border = border;
+  };
+
+  const boxAll: BorderStyle = {
     left: thin(BLACK),
     right: thin(BLACK),
     top: thin(BLACK),
     bottom: thin(BLACK),
-  });
-  const f28 = ws.getCell("F28");
-  f28.value =
+  };
+
+  totalLeft(R.fee, { left: thin(BLACK), right: thin(BLACK), top: thin(BLACK), bottom: hair() });
+  totalCell(
+    R.fee,
+    "ค่าดำเนินการ",
     q.operationFeeMode === "manual"
       ? totals.operationFee
       : ({
-          formula: `SUM(F${FIRST_ITEM_ROW}:F${LAST_ITEM_ROW})*${(q.operationFeeRate ?? 10) / 100}`,
+          formula: `SUM(F${R.itemStart}:F${R.itemEnd})*${(q.operationFeeRate ?? 10) / 100}`,
           result: totals.operationFee,
-        } as ExcelJS.CellFormulaValue);
-  f28.font = ang(16);
-  f28.numFmt = ACCOUNTING;
-  f28.border = { left: thin(BLACK), right: thin(BLACK), top: thin(BLACK), bottom: thin(BLACK) };
+        } as ExcelJS.CellFormulaValue),
+    false,
+    boxAll,
+  );
 
-  totalLeft(29, { left: thin(BLACK), right: thin(BLACK), top: hair(), bottom: hair(BLACK) });
-  set("D29", " รวมเป็นจำนวนเงิน", ang(16, true), { horizontal: "center" }, {
-    left: thin(BLACK),
-    right: thin(BLACK),
-    top: thin(BLACK),
-    bottom: thin(BLACK),
-  });
-  const f29 = ws.getCell("F29");
-  f29.value = {
-    formula: `SUM(F${FIRST_ITEM_ROW}:F28)`,
-    result: totals.subTotal,
-  } as ExcelJS.CellFormulaValue;
-  f29.font = ang(16, true);
-  f29.numFmt = ACCOUNTING;
-  f29.border = { left: thin(BLACK), right: thin(BLACK), bottom: thin(BLACK) };
+  totalLeft(R.sub, { left: thin(BLACK), right: thin(BLACK), top: hair(), bottom: hair(BLACK) });
+  totalCell(
+    R.sub,
+    " รวมเป็นจำนวนเงิน",
+    { formula: `SUM(F${R.itemStart}:F${R.fee})`, result: totals.subTotal } as ExcelJS.CellFormulaValue,
+    true,
+    boxAll,
+  );
 
-  totalLeft(30, { left: thin(), right: thin(), bottom: thin() });
-  set("D30", `ภาษีมูลค่าเพิ่ม ${q.vatRate}%`, ang(16, true), { horizontal: "center" }, {
-    left: thin(),
-    right: thin(),
-    top: thin(BLACK),
-    bottom: thin(),
-  });
-  const f30 = ws.getCell("F30");
-  f30.value = {
-    formula: q.includeVat ? `SUM(F29*${q.vatRate}/100)` : "0",
-    result: totals.vat,
-  } as ExcelJS.CellFormulaValue;
-  f30.font = ang(16, true);
-  f30.numFmt = ACCOUNTING;
-  f30.alignment = { horizontal: "right" };
-  f30.border = { left: thin(), right: thin(), bottom: thin() };
+  totalLeft(R.vat, { left: thin(), right: thin(), bottom: thin() });
+  totalCell(
+    R.vat,
+    `ภาษีมูลค่าเพิ่ม ${q.vatRate}%`,
+    {
+      formula: q.includeVat ? `SUM(F${R.sub}*${q.vatRate}/100)` : "0",
+      result: totals.vat,
+    } as ExcelJS.CellFormulaValue,
+    true,
+    { left: thin(), right: thin(), top: thin(BLACK), bottom: thin() },
+  );
 
   const dbl: ExcelJS.Border = { style: "double", color: { argb: NAVY } };
-  const a31 = ws.getCell("A31");
-  a31.value = {
-    formula: "BAHTTEXT(F31)",
+  const grandBorder: BorderStyle = { left: thin(), right: thin(), top: thin(), bottom: dbl };
+  const a = ws.getCell(`A${R.grand}`);
+  a.value = {
+    formula: `BAHTTEXT(F${R.grand})`,
     result: bahtText(totals.grandTotal),
   } as ExcelJS.CellFormulaValue;
-  a31.font = ang(16, true);
-  a31.alignment = { horizontal: "center" };
-  a31.border = { left: thin(), right: thin(), top: thin(), bottom: dbl };
-  ws.getCell("C31").border = { right: thin(), top: thin(), bottom: dbl };
-  set("D31", "รวมเป็นจำนวนเงินทั้งสิ้น", ang(16, true), { horizontal: "center" }, {
-    left: thin(),
-    right: thin(),
-    top: thin(),
-    bottom: dbl,
-  });
-  const f31 = ws.getCell("F31");
-  f31.value = {
-    formula: "SUM(F29:F30)",
-    result: totals.grandTotal,
-  } as ExcelJS.CellFormulaValue;
-  f31.font = ang(16, true);
-  f31.numFmt = ACCOUNTING;
-  f31.alignment = { horizontal: "right" };
-  f31.border = { left: thin(), right: thin(), top: thin(), bottom: dbl };
+  a.font = ang(16, true);
+  a.alignment = { horizontal: "center" };
+  a.border = grandBorder;
+  ws.getCell(`C${R.grand}`).border = { right: thin(), top: thin(), bottom: dbl };
+  totalCell(
+    R.grand,
+    "รวมเป็นจำนวนเงินทั้งสิ้น",
+    { formula: `SUM(F${R.sub}:F${R.vat})`, result: totals.grandTotal } as ExcelJS.CellFormulaValue,
+    true,
+    grandBorder,
+  );
 
   /* -------------------------------- ท้ายเอกสาร ------------------------------- */
-  set("B33", "จึงเรียนมาเพื่อทราบและโปรดพิจารณาอนุมัติ", ang(16, true));
-  set("A35", "ผู้อนุมัติ", ang(16, true), { horizontal: "right" });
-  set("B35", undefined, ang(16, true), undefined, { bottom: hair(BLACK) });
-  set("E35", "ขอแสดงความนับถือ", ang(16));
-  set("A36", "             วันที่", ang(16, true));
-  set("B36", undefined, ang(16, true), undefined, { bottom: hair(BLACK) });
-  set("E37", `       (${q.quoterName} )`, ang(16));
+  set(`B${R.note}`, "จึงเรียนมาเพื่อทราบและโปรดพิจารณาอนุมัติ", ang(16, true));
+  set(`A${R.approver}`, "ผู้อนุมัติ", ang(16, true), { horizontal: "right" });
+  set(`B${R.approver}`, undefined, ang(16, true), undefined, { bottom: hair(BLACK) });
+  set(`E${R.approver}`, "ขอแสดงความนับถือ", ang(16));
+  set(`A${R.approverDate}`, "             วันที่", ang(16, true));
+  set(`B${R.approverDate}`, undefined, ang(16, true), undefined, { bottom: hair(BLACK) });
+  set(`E${R.signer}`, `       (${q.quoterName} )`, ang(16));
 
   /* ---------------------------------- รูปภาพ --------------------------------- */
   if (images.logo !== undefined) {
@@ -332,7 +344,7 @@ export function writeQuotationSheet(
   }
   if (images.signature !== undefined) {
     ws.addImage(images.signature, {
-      tl: { col: 4.25, row: 35.35 } as ExcelJS.Anchor,
+      tl: { col: 4.25, row: R.grand + 4.35 } as ExcelJS.Anchor,
       ext: { width: 64, height: 29 },
       editAs: "oneCell",
     });
@@ -347,10 +359,12 @@ async function loadBrandImages(
   const publicDir = path.join(process.cwd(), "public");
   const tryAdd = async (file: string) => {
     if (!file) return undefined;
-    const rel = file.replace(/^\//, "");
     try {
-      const buf = await fs.readFile(path.join(publicDir, rel));
-      return wb.addImage({ buffer: new Uint8Array(buf) as unknown as ExcelJS.Buffer, extension: "png" });
+      const buf = await fs.readFile(path.join(publicDir, file.replace(/^\//, "")));
+      return wb.addImage({
+        buffer: new Uint8Array(buf) as unknown as ExcelJS.Buffer,
+        extension: "png",
+      });
     } catch {
       return undefined;
     }
@@ -366,10 +380,8 @@ export async function buildSingleWorkbook(q: Quotation): Promise<Buffer> {
   wb.creator = "ระบบใบเสนอราคา";
   wb.created = new Date();
   const ws = wb.addWorksheet(sheetSafeName(q.unit, "ใบเสนอราคา"));
-  const images = await loadBrandImages(wb, q);
-  writeQuotationSheet(ws, q, images);
-  const buf = await wb.xlsx.writeBuffer();
-  return Buffer.from(buf);
+  writeQuotationSheet(ws, q, await loadBrandImages(wb, q));
+  return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
 /** ไฟล์รวมทั้งเดือน — หนึ่งชีตต่อหนึ่งห้อง */
@@ -384,10 +396,8 @@ export async function buildMonthlyWorkbook(quotations: Quotation[]): Promise<Buf
     while (used.has(name)) name = sheetSafeName(`${q.unit} (${n++})`, `sheet${n}`);
     used.add(name);
     const ws = wb.addWorksheet(name);
-    const images = await loadBrandImages(wb, q);
-    writeQuotationSheet(ws, q, images);
+    writeQuotationSheet(ws, q, await loadBrandImages(wb, q));
   }
   if (!quotations.length) wb.addWorksheet("ว่าง");
-  const buf = await wb.xlsx.writeBuffer();
-  return Buffer.from(buf);
+  return Buffer.from(await wb.xlsx.writeBuffer());
 }

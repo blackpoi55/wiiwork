@@ -22,6 +22,7 @@ import {
   ZoomIn,
 } from "lucide-react";
 import AppShell from "@/components/AppShell";
+import InfoRowsEditor from "@/components/InfoRowsEditor";
 import ItemsEditor from "@/components/ItemsEditor";
 import PhotoManager from "@/components/PhotoManager";
 import QuotationDocument from "@/components/QuotationDocument";
@@ -29,6 +30,14 @@ import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/Confirm";
 import { api, exportUrl, photoUrl } from "@/lib/client";
 import { DEFAULT_SETTINGS, newQuotation } from "@/lib/defaults";
+import { migrateQuotation } from "@/lib/migrate";
+import {
+  PHOTO_LAYOUTS,
+  itemRowCapacity,
+  maxItems,
+  printedItemRows,
+  type PhotosPerPage,
+} from "@/lib/layout";
 import { bahtText, money, thaiDate } from "@/lib/thai";
 import { computeTotals } from "@/lib/totals";
 import type { Quotation, Settings } from "@/lib/types";
@@ -38,23 +47,6 @@ type Tab = "form" | "items" | "photos";
 const PT_TO_PX = 4 / 3;
 const PAGE_W = 595.2 * PT_TO_PX;
 const PAGE_H = 841.8 * PT_TO_PX;
-
-/** เติมค่าที่ขาดให้ไฟล์เก่าที่บันทึกไว้ก่อนหน้า */
-function normalize(q: Quotation, settings: Settings): Quotation {
-  const base = newQuotation(settings);
-  return {
-    ...base,
-    ...q,
-    company: { ...base.company, ...(q.company ?? {}) },
-    conditions: q.conditions?.length ? q.conditions : base.conditions,
-    items: q.items ?? [],
-    photos: q.photos ?? [],
-    operationFeeMode: q.operationFeeMode ?? "auto",
-    operationFeeRate: q.operationFeeRate ?? settings.defaultOperationFee,
-    minRows: q.minRows ?? base.minRows,
-    photosPerPage: q.photosPerPage ?? 6,
-  };
-}
 
 function Section({
   icon: Icon,
@@ -134,7 +126,7 @@ export default function EditorClient() {
         try {
           const data = await api.getQuotation(initialRef);
           if (cancelled) return;
-          setQuotation(normalize(data.quotation, s));
+          setQuotation(migrateQuotation(data.quotation, s));
           setExports(data.exports);
           setRefKey(data.ref);
         } catch (e) {
@@ -160,19 +152,6 @@ export default function EditorClient() {
   }, []);
 
   const totals = useMemo(() => (quotation ? computeTotals(quotation) : null), [quotation]);
-
-  // จำนวนแผ่นรูปแนบ — อัปเดตข้อความ "สิ่งที่ส่งมาด้วย" ให้อัตโนมัติ
-  useEffect(() => {
-    if (!quotation || !loadedRef.current) return;
-    const pages = Math.ceil(quotation.photos.length / quotation.photosPerPage);
-    const expected = `เอกสารภาพความเสียหาย แนบประกอบจำนวน ${pages} แผ่น`;
-    if (
-      /^เอกสารภาพความเสียหาย แนบประกอบจำนวน .* แผ่น$/.test(quotation.attachmentValue) &&
-      quotation.attachmentValue !== expected
-    ) {
-      setQuotation((prev) => (prev ? { ...prev, attachmentValue: expected } : prev));
-    }
-  }, [quotation]);
 
   const save = async (silent = false): Promise<string | null> => {
     const q = latest.current;
@@ -509,76 +488,10 @@ export default function EditorClient() {
 
               <Section
                 icon={ScrollText}
-                title="รายละเอียดงาน & เงื่อนไข"
-                description="ข้อความ 4 บรรทัดฝั่งซ้าย และเงื่อนไขฝั่งขวาของฟอร์ม"
+                title="บล็อกข้อมูลกลางฟอร์ม"
+                description={`เพิ่ม ลบ สลับบรรทัดได้อิสระ · ตอนนี้ ${q.infoRows.length} บรรทัด เหลือที่ใส่รายการงานได้ ${maxItems(q.infoRows.length)} รายการ`}
               >
-                <div className="grid gap-3 sm:grid-cols-[150px_minmax(0,1fr)]">
-                  <Field label="หัวข้อ บรรทัด 1">
-                    <input
-                      className="field"
-                      value={q.detailLabel}
-                      onChange={(e) => patch({ detailLabel: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="ข้อความ บรรทัด 1">
-                    <input
-                      className="field"
-                      value={q.detailValue}
-                      onChange={(e) => patch({ detailValue: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="หัวข้อ บรรทัด 2">
-                    <input
-                      className="field"
-                      value={q.workTypeLabel}
-                      onChange={(e) => patch({ workTypeLabel: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="ข้อความ บรรทัด 2">
-                    <input
-                      className="field"
-                      value={q.workTypeValue}
-                      onChange={(e) => patch({ workTypeValue: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="บรรทัด 3" className="sm:col-span-2">
-                    <input
-                      className="field"
-                      placeholder="ณ.วันที่ 28 มีนาคม 2568"
-                      value={q.incidentDate}
-                      onChange={(e) => patch({ incidentDate: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="หัวข้อ สิ่งที่ส่งมาด้วย">
-                    <input
-                      className="field"
-                      value={q.attachmentLabel}
-                      onChange={(e) => patch({ attachmentLabel: e.target.value })}
-                    />
-                  </Field>
-                  <Field
-                    label="ข้อความ สิ่งที่ส่งมาด้วย"
-                    hint="ปรับจำนวนแผ่นให้อัตโนมัติตามจำนวนหน้ารูป"
-                  >
-                    <input
-                      className="field"
-                      value={q.attachmentValue}
-                      onChange={(e) => patch({ attachmentValue: e.target.value })}
-                    />
-                  </Field>
-                  <Field
-                    label="เงื่อนไข"
-                    hint="บรรทัดละข้อ สูงสุด 4 บรรทัด"
-                    className="sm:col-span-2"
-                  >
-                    <textarea
-                      className="field resize-y"
-                      rows={4}
-                      value={q.conditions.join("\n")}
-                      onChange={(e) => patch({ conditions: e.target.value.split("\n").slice(0, 4) })}
-                    />
-                  </Field>
-                </div>
+                <InfoRowsEditor rows={q.infoRows} onChange={(infoRows) => patch({ infoRows })} />
               </Section>
 
               <Section
@@ -634,11 +547,29 @@ export default function EditorClient() {
                     <select
                       className="field"
                       value={q.photosPerPage}
-                      onChange={(e) => patch({ photosPerPage: Number(e.target.value) as 4 | 6 })}
+                      onChange={(e) =>
+                        patch({ photosPerPage: Number(e.target.value) as PhotosPerPage })
+                      }
                     >
-                      <option value={6}>6 รูป (2×3) — แบบเดิม</option>
-                      <option value={4}>4 รูป (2×2) — รูปใหญ่</option>
+                      {Object.entries(PHOTO_LAYOUTS).map(([value, cfg]) => (
+                        <option key={value} value={value}>
+                          {cfg.label}
+                        </option>
+                      ))}
                     </select>
+                  </Field>
+                  <Field
+                    label="แถวรายการขั้นต่ำที่พิมพ์"
+                    hint={`เว้นบรรทัดว่างไว้ให้เขียนเพิ่มด้วยมือ · ใส่ได้สูงสุด ${itemRowCapacity(q.infoRows.length)} แถว`}
+                  >
+                    <input
+                      type="number"
+                      min={1}
+                      max={itemRowCapacity(q.infoRows.length)}
+                      className="field text-right"
+                      value={q.minRows}
+                      onChange={(e) => patch({ minRows: Number(e.target.value) })}
+                    />
                   </Field>
                 </div>
                 <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-sm text-slate-700">
@@ -659,7 +590,7 @@ export default function EditorClient() {
               <ItemsEditor
                 items={q.items}
                 presets={settings.presets}
-                maxRows={q.minRows - 1}
+                maxRows={maxItems(q.infoRows.length)}
                 onChange={(items) => patch({ items })}
               />
             </div>

@@ -7,6 +7,7 @@ import type {
   Settings,
 } from "./types";
 import { DEFAULT_SETTINGS } from "./defaults";
+import { migrateQuotation, migrateSettings } from "./migrate";
 import { computeTotals } from "./totals";
 
 export const DATA_ROOT =
@@ -125,13 +126,7 @@ async function listDirs(dir: string): Promise<string[]> {
 export async function readSettings(): Promise<Settings> {
   try {
     const raw = await fs.readFile(SETTINGS_FILE, "utf8");
-    const parsed = JSON.parse(raw) as Partial<Settings>;
-    return {
-      ...DEFAULT_SETTINGS,
-      ...parsed,
-      company: { ...DEFAULT_SETTINGS.company, ...(parsed.company ?? {}) },
-      presets: parsed.presets ?? DEFAULT_SETTINGS.presets,
-    };
+    return migrateSettings(JSON.parse(raw) as Partial<Settings>);
   } catch {
     return DEFAULT_SETTINGS;
   }
@@ -146,7 +141,7 @@ export async function writeSettings(settings: Settings): Promise<void> {
 
 export async function readQuotation(ref: QuotationRef): Promise<Quotation> {
   const raw = await fs.readFile(quotationFile(ref), "utf8");
-  return JSON.parse(raw) as Quotation;
+  return migrateQuotation(JSON.parse(raw) as Quotation, await readSettings());
 }
 
 export async function quotationExists(ref: QuotationRef): Promise<boolean> {

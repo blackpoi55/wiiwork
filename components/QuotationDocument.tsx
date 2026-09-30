@@ -1,12 +1,16 @@
 import type { Photo, Quotation } from "@/lib/types";
 import { computeTotals, itemLabel, lineAmount } from "@/lib/totals";
-import { bahtText, money, thaiDate } from "@/lib/thai";
+import { bahtText, money } from "@/lib/thai";
+import { resolveText } from "@/lib/placeholders";
+import {
+  COL_W,
+  LEADING_BLANK_ROWS,
+  PHOTO_GRID,
+  photoCellSize,
+  printedItemRows,
+  type PhotosPerPage,
+} from "@/lib/layout";
 import s from "./QuotationDocument.module.css";
-
-/** จำนวนแถวว่างก่อนรายการแรก (ตรงกับฟอร์ม Excel เดิมที่เว้นแถว 17 ไว้) */
-const LEADING_BLANK_ROWS = 1;
-
-const COLS = [56.1, 227.0, 57.6, 49.6, 49.1, 49.1];
 
 export type PhotoSrc = (photo: Photo) => string;
 
@@ -20,17 +24,15 @@ function Cell({
   className,
   children,
   colSpan,
-  rowSpan,
   style,
 }: {
   className?: string;
   children?: React.ReactNode;
   colSpan?: number;
-  rowSpan?: number;
   style?: React.CSSProperties;
 }) {
   return (
-    <td className={className} colSpan={colSpan} rowSpan={rowSpan} style={style}>
+    <td className={className} colSpan={colSpan} style={style}>
       <span>{children ?? " "}</span>
     </td>
   );
@@ -46,16 +48,17 @@ export default function QuotationDocument({
   const q = quotation;
   const totals = computeTotals(q);
   const company = q.company;
+  const text = (value: string) => resolveText(q, value);
 
   const filled = q.items.filter((i) => i.description.trim() || i.qty || i.unitPrice);
-  const blanksAfter = Math.max(0, q.minRows - LEADING_BLANK_ROWS - filled.length);
+  const rowCount = printedItemRows(q.infoRows.length, filled.length, q.minRows);
+  const visibleItems = filled.slice(0, Math.max(0, rowCount - LEADING_BLANK_ROWS));
+  const blanksAfter = Math.max(0, rowCount - LEADING_BLANK_ROWS - visibleItems.length);
 
   const photos = [...q.photos].sort((a, b) => a.order - b.order);
-  const photoPages = chunk(photos, q.photosPerPage);
-  const cols = q.photosPerPage === 4 ? 2 : 2;
-  const rows = q.photosPerPage === 4 ? 2 : 3;
-  const cellW = q.photosPerPage === 4 ? 225.4 : 225.4;
-  const cellH = q.photosPerPage === 4 ? 339.5 : 226.5;
+  const perPage = q.photosPerPage as PhotosPerPage;
+  const { cols, rows, cellW, cellH } = photoCellSize(perPage);
+  const photoPages = chunk(photos, perPage);
 
   return (
     <div className={`${s.doc} ${s.ang}`}>
@@ -109,191 +112,148 @@ export default function QuotationDocument({
 
         <div className={s.title}>ใบขอเสนอราคา</div>
 
-        <table className={s.table}>
-          <colgroup>
-            {COLS.map((w, i) => (
-              <col key={i} style={{ width: `${w}pt` }} />
-            ))}
-          </colgroup>
-          <tbody>
-            {/* ---------------------------- บล็อกข้อมูลหัวเรื่อง --------------------------- */}
-            <tr>
-              <Cell className={s.labelL}>เสนอต่อ</Cell>
-              <Cell className={s.valueL}>{q.customerName}</Cell>
-              <Cell className={s.labelR}>อ้างถึง P/O No.</Cell>
-              <Cell className={s.valueR} colSpan={3}>
-                {q.poRef}
-              </Cell>
-            </tr>
-            <tr>
-              <Cell className={s.labelL} />
-              <Cell className={`${s.valueL} ${s.bold}`}>{q.addressLine}</Cell>
-              <Cell className={s.labelR}>วันที่</Cell>
-              <Cell className={s.valueR} colSpan={3}>
-                {thaiDate(q.date)}
-              </Cell>
-            </tr>
-            <tr>
-              <Cell className={s.labelL} />
-              <Cell className={s.valueL} />
-              <Cell className={s.labelR}>ผู้ขอเสนอราคา</Cell>
-              <Cell className={s.valueR} colSpan={3}>
-                {q.quoterName}
-              </Cell>
-            </tr>
-            <tr>
-              <Cell className={s.labelL} />
-              <Cell className={s.valueL} />
-              <Cell className={s.labelR} />
-              <Cell className={s.valueR} colSpan={3} />
-            </tr>
-            <tr>
-              <Cell className={s.labelL}>{q.detailLabel}</Cell>
-              <Cell className={s.valueL}>{q.detailValue}</Cell>
-              <Cell className={s.labelR}>เงื่อนไข</Cell>
-              <Cell className={s.valueR} colSpan={3}>
-                {q.conditions[0]}
-              </Cell>
-            </tr>
-            <tr>
-              <Cell className={s.labelL}>{q.workTypeLabel}</Cell>
-              <Cell className={`${s.valueL} ${s.bold}`}>{q.workTypeValue}</Cell>
-              <Cell className={s.labelR} />
-              <Cell className={s.valueR} colSpan={3}>
-                {q.conditions[1]}
-              </Cell>
-            </tr>
-            <tr>
-              <Cell className={s.labelL} />
-              <Cell className={`${s.valueL} ${s.bold}`}>{q.incidentDate}</Cell>
-              <Cell className={s.labelR} />
-              <Cell className={s.valueR} colSpan={3}>
-                {q.conditions[2]}
-              </Cell>
-            </tr>
-            <tr>
-              <Cell className={s.labelL}>{q.attachmentLabel}</Cell>
-              <Cell className={`${s.valueL} ${s.bold}`}>{q.attachmentValue}</Cell>
-              <Cell className={s.labelR} />
-              <Cell className={s.valueR} colSpan={3}>
-                {q.conditions[3]}
-              </Cell>
-            </tr>
+        <div className={s.body}>
+          <table className={s.table}>
+            <colgroup>
+              {COL_W.map((w, i) => (
+                <col key={i} style={{ width: `${w}pt` }} />
+              ))}
+            </colgroup>
+            <tbody>
+              {/* --------------------------- บล็อกข้อมูลหัวเรื่อง -------------------------- */}
+              {q.infoRows.map((row) => (
+                <tr key={row.id}>
+                  <Cell className={s.labelL}>{text(row.leftLabel)}</Cell>
+                  <Cell className={`${s.valueL} ${row.leftBold ? s.bold : ""}`}>
+                    {text(row.leftValue)}
+                  </Cell>
+                  <Cell className={s.labelR}>{text(row.rightLabel)}</Cell>
+                  <Cell className={s.valueR} colSpan={3}>
+                    {text(row.rightValue)}
+                  </Cell>
+                </tr>
+              ))}
 
-            {/* ------------------------------- หัวตารางรายการ ------------------------------ */}
-            <tr style={{ height: "35.8pt" }}>
-              <td className={s.headCell} style={{ height: "35.8pt" }}>
-                <span>ลำดับ</span>
-              </td>
-              <td className={s.headCell}>
-                <span>รายการ</span>
-              </td>
-              <td className={s.headCell}>
-                <span>หน่วย</span>
-              </td>
-              <td className={s.headCell}>
-                <span>จำนวน </span>
-              </td>
-              <td className={`${s.headCell} ${s.headTwoLine}`}>
-                <span>
-                  ราคา/หน่วย
-                  <br />
-                  (บาท)
-                </span>
-              </td>
-              <td className={`${s.headCell} ${s.headTwoLine}`}>
-                <span>
-                  จำนวนเงิน
-                  <br />
-                  (บาท)
-                </span>
-              </td>
-            </tr>
-
-            {/* -------------------------------- แถวรายการ -------------------------------- */}
-            {Array.from({ length: LEADING_BLANK_ROWS }).map((_, i) => (
-              <tr key={`lead-${i}`}>
-                <Cell className={s.rightTight} />
-                <Cell className={s.desc} />
-                <Cell className={s.center} />
-                <Cell className={s.rightTight} />
-                <Cell className={s.right} />
-                <Cell className={s.dash}>-</Cell>
+              {/* ------------------------------ หัวตารางรายการ ----------------------------- */}
+              <tr style={{ height: "35.8pt" }}>
+                <td className={s.headCell} style={{ height: "35.8pt" }}>
+                  <span>ลำดับ</span>
+                </td>
+                <td className={s.headCell}>
+                  <span>รายการ</span>
+                </td>
+                <td className={s.headCell}>
+                  <span>หน่วย</span>
+                </td>
+                <td className={s.headCell}>
+                  <span>จำนวน </span>
+                </td>
+                <td className={s.headCell}>
+                  <span>
+                    ราคา/หน่วย
+                    <br />
+                    (บาท)
+                  </span>
+                </td>
+                <td className={s.headCell}>
+                  <span>
+                    จำนวนเงิน
+                    <br />
+                    (บาท)
+                  </span>
+                </td>
               </tr>
-            ))}
-            {filled.map((item, i) => (
-              <tr key={item.id}>
-                <Cell className={s.rightTight}>{i + 1}</Cell>
-                <Cell className={s.desc}>{itemLabel(i + 1, item.description)}</Cell>
-                <Cell className={s.center}>{item.unit}</Cell>
-                <Cell className={s.rightTight}>{item.qty || ""}</Cell>
-                <Cell className={s.right}>{item.unitPrice ? money(item.unitPrice) : ""}</Cell>
-                <Cell className={s.right}>{money(lineAmount(item))}</Cell>
-              </tr>
-            ))}
-            {Array.from({ length: blanksAfter }).map((_, i) => (
-              <tr key={`tail-${i}`}>
-                <Cell className={s.rightTight} />
-                <Cell className={s.desc} />
-                <Cell className={s.center} />
-                <Cell className={s.rightTight} />
-                <Cell className={s.right} />
-                <Cell className={s.dash}>-</Cell>
-              </tr>
-            ))}
 
-            {/* ---------------------------------- สรุปยอด --------------------------------- */}
-            <tr>
-              <Cell colSpan={3} />
-              <Cell className={s.center} colSpan={2}>
-                ค่าดำเนินการ
-              </Cell>
-              <Cell className={s.right}>{money(totals.operationFee)}</Cell>
-            </tr>
-            <tr>
-              <Cell colSpan={3} />
-              <Cell className={`${s.center} ${s.bold}`} colSpan={2}>
-                {" "}
-                รวมเป็นจำนวนเงิน
-              </Cell>
-              <Cell className={`${s.right} ${s.bold}`}>{money(totals.subTotal)}</Cell>
-            </tr>
-            <tr>
-              <Cell colSpan={3} />
-              <Cell className={`${s.center} ${s.bold}`} colSpan={2}>
-                ภาษีมูลค่าเพิ่ม {q.vatRate}%
-              </Cell>
-              <Cell className={`${s.right} ${s.bold}`}>{money(totals.vat)}</Cell>
-            </tr>
-            <tr>
-              <Cell className={`${s.center} ${s.bold}`} colSpan={3}>
-                {bahtText(totals.grandTotal)}
-              </Cell>
-              <Cell className={`${s.center} ${s.bold}`} colSpan={2}>
-                รวมเป็นจำนวนเงินทั้งสิ้น
-              </Cell>
-              <Cell className={`${s.right} ${s.bold}`}>{money(totals.grandTotal)}</Cell>
-            </tr>
-          </tbody>
-        </table>
+              {/* ------------------------------- แถวรายการ ------------------------------- */}
+              {Array.from({ length: LEADING_BLANK_ROWS }).map((_, i) => (
+                <tr key={`lead-${i}`}>
+                  <Cell className={s.rightTight} />
+                  <Cell className={s.desc} />
+                  <Cell className={s.center} />
+                  <Cell className={s.rightTight} />
+                  <Cell className={s.right} />
+                  <Cell className={s.dash}>-</Cell>
+                </tr>
+              ))}
+              {visibleItems.map((item, i) => (
+                <tr key={item.id}>
+                  <Cell className={s.rightTight}>{i + 1}</Cell>
+                  <Cell className={s.desc}>{itemLabel(i + 1, text(item.description))}</Cell>
+                  <Cell className={s.center}>{item.unit}</Cell>
+                  <Cell className={s.rightTight}>{item.qty || ""}</Cell>
+                  <Cell className={s.right}>{item.unitPrice ? money(item.unitPrice) : ""}</Cell>
+                  <Cell className={s.right}>{money(lineAmount(item))}</Cell>
+                </tr>
+              ))}
+              {Array.from({ length: blanksAfter }).map((_, i) => (
+                <tr key={`tail-${i}`}>
+                  <Cell className={s.rightTight} />
+                  <Cell className={s.desc} />
+                  <Cell className={s.center} />
+                  <Cell className={s.rightTight} />
+                  <Cell className={s.right} />
+                  <Cell className={s.dash}>-</Cell>
+                </tr>
+              ))}
 
-        <div className={`${s.abs} ${s.note}`}>จึงเรียนมาเพื่อทราบและโปรดพิจารณาอนุมัติ</div>
-        <div className={`${s.abs} ${s.approver}`}>ผู้อนุมัติ</div>
-        <div className={`${s.abs} ${s.approverDate}`}>วันที่</div>
-        <div className={s.ruleA} />
-        <div className={s.ruleB} />
-        <div className={`${s.abs} ${s.regards}`}>ขอแสดงความนับถือ</div>
-        {company.signatureFile ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img className={s.signature} src={company.signatureFile} alt="" />
-        ) : null}
-        <div className={`${s.abs} ${s.signerName}`}>{`       (${q.quoterName} )`}</div>
+              {/* --------------------------------- สรุปยอด -------------------------------- */}
+              <tr>
+                <Cell colSpan={3} />
+                <Cell className={s.center} colSpan={2}>
+                  ค่าดำเนินการ
+                </Cell>
+                <Cell className={s.right}>{money(totals.operationFee)}</Cell>
+              </tr>
+              <tr>
+                <Cell colSpan={3} />
+                <Cell className={`${s.center} ${s.bold}`} colSpan={2}>
+                  {" "}
+                  รวมเป็นจำนวนเงิน
+                </Cell>
+                <Cell className={`${s.right} ${s.bold}`}>{money(totals.subTotal)}</Cell>
+              </tr>
+              <tr>
+                <Cell colSpan={3} />
+                <Cell className={`${s.center} ${s.bold}`} colSpan={2}>
+                  ภาษีมูลค่าเพิ่ม {q.vatRate}%
+                </Cell>
+                <Cell className={`${s.right} ${s.bold}`}>{money(totals.vat)}</Cell>
+              </tr>
+              <tr>
+                <Cell className={`${s.center} ${s.bold}`} colSpan={3}>
+                  {bahtText(totals.grandTotal)}
+                </Cell>
+                <Cell className={`${s.center} ${s.bold}`} colSpan={2}>
+                  รวมเป็นจำนวนเงินทั้งสิ้น
+                </Cell>
+                <Cell className={`${s.right} ${s.bold}`}>{money(totals.grandTotal)}</Cell>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className={s.footer}>
+            <div className={s.note}>จึงเรียนมาเพื่อทราบและโปรดพิจารณาอนุมัติ</div>
+            <div className={s.approver}>ผู้อนุมัติ</div>
+            <div className={s.approverDate}>วันที่</div>
+            <div className={s.ruleA} />
+            <div className={s.ruleB} />
+            <div className={s.regards}>ขอแสดงความนับถือ</div>
+            {company.signatureFile ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className={s.signature} src={company.signatureFile} alt="" />
+            ) : null}
+            <div className={s.signerName}>{`       (${q.quoterName} )`}</div>
+          </div>
+        </div>
       </div>
 
       {/* ----------------------------- หน้ารูปความเสียหาย ---------------------------- */}
       {photoPages.map((pagePhotos, pageIndex) => (
         <div className={s.page} key={`photo-page-${pageIndex}`}>
-          <table className={s.photoTable}>
+          <table
+            className={s.photoTable}
+            style={{ left: `${PHOTO_GRID.left}pt`, top: `${PHOTO_GRID.top}pt` }}
+          >
             <tbody>
               {Array.from({ length: rows }).map((_, r) => (
                 <tr key={r}>
@@ -303,23 +263,19 @@ export default function QuotationDocument({
                       <td
                         key={c}
                         className={s.photoCell}
-                        style={{
-                          width: `${cellW}pt`,
-                          height: `${cellH}pt`,
-                          boxSizing: "border-box",
-                        }}
+                        style={{ width: `${cellW}pt`, height: `${cellH}pt` }}
                       >
-                        {photo ? (
-                          <div className={s.photoBox}>
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img className={s.photoImg} src={photoSrc(photo)} alt="" />
-                            {photo.caption?.trim() ? (
-                              <div className={s.photoCaption}>{photo.caption}</div>
-                            ) : null}
-                          </div>
-                        ) : (
-                          <div className={s.photoBox} />
-                        )}
+                        <div className={s.photoBox}>
+                          {photo ? (
+                            <>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img className={s.photoImg} src={photoSrc(photo)} alt="" />
+                              {photo.caption?.trim() ? (
+                                <div className={s.photoCaption}>{text(photo.caption)}</div>
+                              ) : null}
+                            </>
+                          ) : null}
+                        </div>
                       </td>
                     );
                   })}
